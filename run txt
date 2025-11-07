@@ -1,0 +1,20 @@
+g++ \
+    -I/usr/include/postgresql \
+    -I ~/decs/Project_main/civetweb/include \
+    ~/decs/Project_main/main.cpp \
+    ~/decs/Project_main/civetweb/src/libcivetweb.a \
+    -L/usr/lib/x86_64-linux-gnu -lpq -pthread \
+    -o kv_server
+
+
+
+host=localhost port=5432 dbname=kvdb user=kvuser password=kvpass
+ relation name - kv_store
+psql -h localhost -d kvdb -U kvuser
+
+
+
+//for random
+g++     -I/usr/include/postgresql     -I ~/decs/Project_main/civetweb/include     ~/decs/Project_main/random_request.cpp     ~/decs/Project_main/civetweb/src/libcivetweb.a     -L/usr/lib/x86_64-linux-gnu -lpq -pthread     -o random_all_fast -lcurl
+
+

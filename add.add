@@ -1,0 +1,128 @@
+// ---------- Simple in-memory cache ----------
+#include"main.cpp"
+struct CacheEntry {
+    std::string value;
+    std::chrono::steady_clock::time_point expiry;
+};
+
+class InMemoryCache {
+private:
+    std::unordered_map<std::string, CacheEntry> map_;
+    std::mutex m_;
+    std::chrono::seconds ttl_;
+
+public:
+    explicit InMemoryCache(std::chrono::seconds ttl = std::chrono::seconds(60))
+        : ttl_(ttl) {}
+
+    bool get(const std::string &key, std::string &out) {
+        std::lock_guard<std::mutex> lock(m_);
+        auto it = map_.find(key);
+        if (it == map_.end())
+            return false;
+        if (std::chrono::steady_clock::now() > it->second.expiry) {
+            map_.erase(it);
+            return false;
+        }
+        out = it->second.value;
+        return true;
+    }
+
+    void set(const std::string &key, const std::string &value) {
+        std::lock_guard<std::mutex> lock(m_);
+        map_[key] = { value, std::chrono::steady_clock::now() + ttl_ };
+    }
+
+    void erase(const std::string &key) {
+        std::lock_guard<std::mutex> lock(m_);
+        map_.erase(key);
+    }
+};
+class KVHandler : public CivetHandler {
+private:
+    PGPool &pool_;
+    InMemoryCache cache_{std::chrono::seconds(60)}; // 1-minute TTL
+
+bool doGet(struct mg_connection *conn, const std::string &key)
+{
+    std::string cached;
+    if (cache_.get(key, cached)) {
+        send_json(conn, 200, json{{"key", key}, {"value", cached}, {"cached", true}});
+        return true;
+    }
+
+    PGconn *pg = pool_.acquire();
+    const char *paramValues[1] = {key.c_str()};
+    PGresult *res = PQexecPrepared(pg, "kv_get", 1, paramValues, nullptr, nullptr, 0);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        std::string err = PQerrorMessage(pg);
+        PQclear(res);
+        pool_.release(pg);
+        send_json(conn, 500, json{{"error", "db_error"}, {"message", err}});
+        return true;
+    }
+
+    if (PQntuples(res) == 0) {
+        PQclear(res);
+        pool_.release(pg);
+        send_json(conn, 404, json{{"error", "not_found"}});
+        return true;
+    }
+
+    char *val = PQgetvalue(res, 0, 0);
+    std::string value(val ? val : "");
+    PQclear(res);
+    pool_.release(pg);
+
+    cache_.set(key, value); // cache it
+
+    send_json(conn, 200, json{{"key", key}, {"value", value}});
+    return true;
+}
+
+bool doPut(struct mg_connection *conn, const std::string &key, const struct mg_request_info *ri)
+{
+    // (existing body parsing)
+    // ...
+    PGconn *pg = pool_.acquire();
+    const char *paramValues[2] = {key.c_str(), value.c_str()};
+    PGresult *res = PQexecPrepared(pg, "kv_put", 2, paramValues, nullptr, nullptr, 0);
+
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        std::string err = PQerrorMessage(pg);
+        PQclear(res);
+        pool_.release(pg);
+        send_json(conn, 500, json{{"error", "db_error"}, {"message", err}});
+        return true;
+    }
+    PQclear(res);
+    pool_.release(pg);
+
+    cache_.set(key, value);  // update cache with new value
+
+    send_json(conn, 200, json{{"status", "ok"}, {"key", key}, {"value", value}});
+    return true;
+}
+
+bool doDelete(struct mg_connection *conn, const std::string &key)
+{
+    PGconn *pg = pool_.acquire();
+    const char *paramValues[1] = {key.c_str()};
+    PGresult *res = PQexecPrepared(pg, "kv_del", 1, paramValues, nullptr, nullptr, 0);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        std::string err = PQerrorMessage(pg);
+        PQclear(res);
+        pool_.release(pg);
+        send_json(conn, 500, json{{"error", "db_error"}, {"message", err}});
+        return true;
+    }
+    PQclear(res);
+    pool_.release(pg);
+
+    cache_.erase(key);  // invalidate
+
+    send_json(conn, 200, json{{"status", "deleted"}, {"key", key}});
+    return true;
+}
+}
