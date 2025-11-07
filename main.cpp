@@ -17,6 +17,11 @@
 #include <mutex>         // --- CACHE ---
 //#include <scoped_lock>   // --- CACHE ---
 
+// ---CACHE---
+    // Define the max number of items for the LRU cache
+    const size_t CACHE_MAX_ITEMS = 10000;
+    // ---END CACHE---
+
 using json = nlohmann::json;
 
 // ---------- Simple Postgres connection pool ----------
@@ -262,11 +267,12 @@ private:
      * Loads all existing data from the database into the in-memory cache.
      * This is called a "cache warm-up".
      */
-    void warmUpCache()
+    void warmUpCache(size_t limit)
     {
         std::cout << "Warming up cache from database..." << std::endl;
         PGconn *pg = pool_.acquire();
-        PGresult *res = PQexec(pg, "SELECT k, v FROM kv_store ORDER BY updated_at DESC");
+        std::string query = "SELECT k, v FROM kv_store ORDER BY updated_at DESC LIMIT " + std::to_string(limit);
+        PGresult *res = PQexec(pg, query.c_str());
 
         if (PQresultStatus(res) == PGRES_TUPLES_OK)
         {
@@ -284,7 +290,7 @@ private:
                     cache_.put( std::string(key) , std::string(val));
                 }
             }
-            std::cout << "Cache warm-up complete. "<< std::endl;
+            std::cout << "Cache warm-up complete. Loaded " << rows << " items.\n";
         }
         else
         {
@@ -424,7 +430,7 @@ public:
         : pool_(pool), cache_(cache_size)
     {
         // --- CACHE ---
-        warmUpCache();
+        warmUpCache(CACHE_MAX_ITEMS);
         // --- END CACHE ---
     }
 
@@ -497,13 +503,6 @@ int main(int argc, char **argv)
     const std::string conninfo =
         argc > 1 ? argv[1]
                  : "host=localhost port=5432 dbname=kvdb user=kvuser password=kvpass";
-
-    // ---CACHE---
-    // Define the max number of items for the LRU cache
-    const size_t CACHE_MAX_ITEMS = 10000;
-    // ---END CACHE---
-
-
     try
     {
         PGPool pool(conninfo, 4);
