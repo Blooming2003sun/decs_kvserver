@@ -13,18 +13,16 @@
 #include "CivetServer.h"
 #include <nlohmann/json.hpp> //fot json
 
-#include <unordered_map> // --- CACHE ---
-#include <mutex>         // --- CACHE ---
-//#include <scoped_lock>   // --- CACHE ---
+#include <unordered_map> 
+#include <mutex>         
+//#include <scoped_lock>   
 
-// ---CACHE---
     // Define the max number of items for the LRU cache
     const size_t CACHE_MAX_ITEMS = 10000;
-    // ---END CACHE---
 
 using json = nlohmann::json;
 
-// ---------- Simple Postgres connection pool ----------
+
 class PGPool
 {
 private:
@@ -109,7 +107,6 @@ public:
     }
 };
 
-// ---------- Helper: URL decode ----------
 static std::string url_decode(const std::string &s)
 {
     std::string ret;
@@ -136,7 +133,6 @@ static std::string url_decode(const std::string &s)
     return ret;
 }
 
-// ---------- Helper: send JSON ----------
 static void send_json(struct mg_connection *conn, int status, const json &j)
 {
     std::string body = j.dump();
@@ -150,18 +146,11 @@ static void send_json(struct mg_connection *conn, int status, const json &j)
     mg_write(conn, s.c_str(), (int)s.size());
 }
 
-// ---------- LRU CACHE CLASS ----------
-/**
- * @brief A thread-safe, fixed-size LRU (Least Recently Used) cache.
- *
- * It combines an std::unordered_map for O(1) lookups and an std::list
- * to maintain the usage order (MRU -> LRU).
- */
 class LRUCache {
 private:
     // The list stores {key, value} pairs.
-    // Front of the list is MRU (Most Recently Used).
-    // Back of the list is LRU (Least Recently Used).
+    // Front of the list is MRU .
+    // Back of the list is LRU .
     std::list<std::pair<std::string, std::string>> lru_list_;
 
     // The map stores the key and an *iterator* to its position in the list.
@@ -178,11 +167,7 @@ public:
         }
     }
 
-    /**
-     * @brief Puts a key-value pair into the cache.
-     * If the key exists, its value is updated, and it becomes the MRU.
-     * If the key is new and the cache is full, the LRU item is evicted.
-     */
+    
     void put(const std::string& key, const std::string& value) {
         std::scoped_lock lock(cache_mutex_);
 
@@ -212,13 +197,7 @@ public:
         cache_map_[key] = lru_list_.begin();
     }
 
-    /**
-     * @brief Gets a value by key.
-     * If the key is found (HIT), it becomes the MRU.
-     * @param key The key to find.
-     * @param value_out A reference to store the found value.
-     * @return true if found (HIT), false if not found (MISS).
-     */
+    
     bool get(const std::string& key, std::string& value_out) {
         std::scoped_lock lock(cache_mutex_);
 
@@ -238,7 +217,7 @@ public:
     }
 
     /**
-     * @brief Erases a key from the cache.
+     *  Erases a key from the cache.
      */
     void erase(const std::string& key) {
         std::scoped_lock lock(cache_mutex_);
@@ -250,7 +229,7 @@ public:
         }
     }
 };
-// ---------- END LRU CACHE CLASS ----------
+
 
 // ---------- KVHandler ----------
 class KVHandler : public CivetHandler
@@ -262,11 +241,7 @@ private:
     LRUCache cache_;
     // --- END CACHE ---
 
-    /**
-     * @brief --- CACHE ---
-     * Loads all existing data from the database into the in-memory cache.
-     * This is called a "cache warm-up".
-     */
+    
     void warmUpCache(size_t limit)
     {
         std::cout << "Warming up cache from database..." << std::endl;
@@ -376,7 +351,7 @@ private:
         }
         catch (...)
         {
-            // fallback: treat as raw string
+            //  treat as raw string
         }
 
         PGconn *pg = pool_.acquire();
@@ -475,29 +450,9 @@ public:
         std::string key = url_decode(uri.substr(4));
         return doDelete(conn, key);
     }
-
-    // bool handle(CivetServer *server, struct mg_connection *conn) override {
-    //     const auto *ri = mg_get_request_info(conn);
-    //     std::string method = ri->request_method ? ri->request_method : "";
-    //     std::string uri = ri->local_uri ? ri->local_uri : "";
-
-    //     if (uri.rfind("/kv/", 0) != 0) {
-    //         send_json(conn, 404, json{{"error", "not_found"}});
-    //         return true;
-    //     }
-    //     std::string key = url_decode(uri.substr(4));
-
-    //     if (method == "GET")       return doGet(conn, key);
-    //     else if (method == "PUT")  return doPut(conn, key, ri);
-    //     else if (method == "DELETE") return doDelete(conn, key);
-    //     else {
-    //         send_json(conn, 405, json{{"error", "method_not_allowed"}});
-    //         return true;
-    //     }
-    // }
 };
 
-// ---------- main ----------
+
 int main(int argc, char **argv)
 {
     const std::string conninfo =
@@ -510,10 +465,10 @@ int main(int argc, char **argv)
         const char *options[] = {
             "document_root", ".", "listening_ports", "8080", nullptr};
         CivetServer server(options);
-        // --- CACHE ---
+        
         // Pass the cache size to the handler
         KVHandler handler(pool,CACHE_MAX_ITEMS);
-        // --- END CACHE ---
+        
         server.addHandler("/kv", handler);
 
         std::cout << "KV Server listening on http://0.0.0.0:8080\n";
