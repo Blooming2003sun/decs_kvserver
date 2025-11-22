@@ -50,7 +50,7 @@ public:
             {
                 const char *create =
                     "CREATE TABLE IF NOT EXISTS kv_store ("
-                    "k TEXT PRIMARY KEY,"
+                    "k INTEGER PRIMARY KEY,"
                     "v TEXT,"
                     "updated_at TIMESTAMP DEFAULT now()"
                     ")";
@@ -74,7 +74,10 @@ public:
             PQclear(PQprepare(c, "kv_del", "DELETE FROM kv_store WHERE k=$1", 1, nullptr));
 
             // Push the now fully-initialized connection into the pool
-            conns_.push(c);
+
+            std::cout << "DEBUG: Connection " << i + 1 << " established and prepared.\n";//
+    conns_.push(c);
+    std::cout << "DEBUG: Connection " << i + 1 << " pushed to queue. Queue size: " << conns_.size() << "\n";//
         }
     }
 
@@ -148,9 +151,6 @@ static void send_json(struct mg_connection *conn, int status, const json &j)
 
 class LRUCache {
 private:
-    // The list stores {key, value} pairs.
-    // Front of the list is MRU .
-    // Back of the list is LRU .
     std::list<std::pair<std::string, std::string>> lru_list_;
 
     // The map stores the key and an *iterator* to its position in the list.
@@ -245,9 +245,12 @@ private:
     void warmUpCache(size_t limit)
     {
         std::cout << "Warming up cache from database..." << std::endl;
-        PGconn *pg = pool_.acquire();
+        PGconn *pg = pool_.acquire();////
+        std::cout << "DEBUG 1: Connection acquired.\n";
         std::string query = "SELECT k, v FROM kv_store ORDER BY updated_at DESC LIMIT " + std::to_string(limit);
+        std::cout << "DEBUG 2: Running query: " << query << "\n";////
         PGresult *res = PQexec(pg, query.c_str());
+        std::cout << "DEBUG 3: Query finished execution.\n";//
 
         if (PQresultStatus(res) == PGRES_TUPLES_OK)
         {
@@ -457,7 +460,7 @@ int main(int argc, char **argv)
 {
     const std::string conninfo =
         argc > 1 ? argv[1]
-                 : "host=localhost port=5432 dbname=kvdb user=kvuser password=kvpass";
+                 : "host=kv_postgres port=5432 dbname=kvdb user=kvuser password=kvpass";
     try
     {
         PGPool pool(conninfo, 4);

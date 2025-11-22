@@ -22,7 +22,39 @@ size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
 
 int main() {
     srand(time(0));
-    const std::string BASE_URL = "http://localhost:8080/kv";
+    const std::string BASE_URL = "http://kv_server:8080/kv";
+
+    int get_percent = 70; // Default values
+    int put_percent = 20;
+
+
+    // Read GET_PERCENT
+    if (const char* env_p = std::getenv("GET_PERCENT")) {
+        try {
+            get_percent = std::stoi(env_p);
+            if (get_percent < 0 || get_percent > 100) get_percent = 70; // Basic validation
+        } catch (...) {
+            std::cerr << "Warning: Invalid GET_PERCENT value. Using default (70).\n";
+        }
+    }
+
+    // Read PUT_PERCENT
+    if (const char* env_p = std::getenv("PUT_PERCENT")) {
+        try {
+            put_percent = std::stoi(env_p);
+            if (put_percent < 0 || put_percent > 100) put_percent = 20; // Basic validation
+        } catch (...) {
+            std::cerr << "Warning: Invalid PUT_PERCENT value. Using default (20).\n";
+        }
+    }
+    
+    // Calculate Thresholds based on runtime input
+    const int GET_THRESHOLD = get_percent;
+    const int PUT_THRESHOLD = GET_THRESHOLD + put_percent;
+    
+    std::cout << "Starting Load Tester with: GET=" << get_percent
+              << "%, PUT=" << put_percent
+              << "%, DELETE=" << (100 - PUT_THRESHOLD) << "%\n";
 
     CURL* curl;
     CURLcode res;
@@ -32,11 +64,18 @@ int main() {
     curl = curl_easy_init();
     if(!curl) return 1;
 
-    std::vector<std::string> methods = {"GET"};//, "PUT", "POST", "DELETE"};
 
     while (true) {
-        std::string method = methods[rand() % methods.size()];
-        std::string key = "key" + std::to_string(rand());
+        int r = rand() % 100;
+        std::string method ;
+        if (r < GET_THRESHOLD) {
+            method = "GET";
+        } else if (r < PUT_THRESHOLD) {
+            method = "PUT";
+        } else {
+            method = "DELETE";
+        }
+        std::string key = std::to_string(rand());
         std::string url = BASE_URL + "/" + key;
         std::string data = "{\"value\":\"" + random_string(10) + "\"}";
         std::string response;
@@ -63,7 +102,7 @@ int main() {
         if(res != CURLE_OK)
             std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
         else
-            std::cout << method << " " << url << " → " << response << std::endl;
+           // std::cout << method << " " << url << " → " << response << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(5));// 500  || 50 
     }

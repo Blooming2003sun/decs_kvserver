@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: kv_postgres
+    environment:
+      POSTGRES_USER: kvuser
+      POSTGRES_PASSWORD: kvpass
+      POSTGRES_DB: kvdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  kv_server:
+    build: ./server
+    container_name: kv_server
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_USER: kvuser
+      DB_PASSWORD: kvpass
+      DB_NAME: kvdb
+    ports:
+      - "8080:8080"
+
+  loadtester:
+    build: ./loadtester
+    container_name: loadtester
+    depends_on:
+      kv_server :
+        condition: service_started
+    environment:
+      SERVER_HOST: kv_server
+      SERVER_PORT: 8080
+      GET_PERCENT: 5  # Will override the default 70
+      PUT_PERCENT: 90  # Will override the default 20
+
+volumes:
+  pgdata:
