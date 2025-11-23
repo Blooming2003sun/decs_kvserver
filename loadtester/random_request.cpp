@@ -21,6 +21,7 @@ size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
 }
 
 int main() {
+    std::cout<<"load tester started : \n";
     srand(time(0));
     const std::string BASE_URL = "http://kv_server:8080/kv";
 
@@ -75,9 +76,9 @@ int main() {
         } else {
             method = "DELETE";
         }
-        std::string key = std::to_string(rand());
+        std::string key = std::to_string(rand()%100000);
         std::string url = BASE_URL + "/" + key;
-        std::string data = "{\"value\":\"" + random_string(10) + "\"}";
+        std::string data = "{\"value\":\"" + random_string(127) + "\"}";
         std::string response;
 
         curl_easy_reset(curl);
@@ -102,7 +103,7 @@ int main() {
         if(res != CURLE_OK)
             std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
         else
-           // std::cout << method << " " << url << " → " << response << std::endl;
+            std::cout << method << " " << url << " → " << response << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(5));// 500  || 50 
     }

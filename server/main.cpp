@@ -50,8 +50,9 @@ public:
             {
                 const char *create =
                     "CREATE TABLE IF NOT EXISTS kv_store ("
-                    "k INTEGER PRIMARY KEY,"
+                    "k INTEGER ,"
                     "v TEXT,"
+                    "PRIMARY KEY (v, k),"
                     "updated_at TIMESTAMP DEFAULT now()"
                     ")";
                 PGresult *r = PQexec(c, create);
@@ -199,6 +200,15 @@ public:
 
     
     bool get(const std::string& key, std::string& value_out) {
+        //double k ;
+        // for(int i=0;i<2;i++)
+        // {
+        //     for(int j= 0;j<2;i++)
+        //         for(int k=0;k<2;k++)
+        //         {
+        //             k=(rand()%10000) * (rand()%10000);
+        //         }
+        // }
         std::scoped_lock lock(cache_mutex_);
 
         auto it = cache_map_.find(key);
@@ -408,7 +418,7 @@ public:
         : pool_(pool), cache_(cache_size)
     {
         // --- CACHE ---
-        warmUpCache(CACHE_MAX_ITEMS);
+        //warmUpCache(CACHE_MAX_ITEMS);
         // --- END CACHE ---
     }
 

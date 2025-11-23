@@ -1,0 +1,8 @@
+docker run -d --name kv_postgres --cpuset-cpus="0" -e POSTGRES_USER=kvuser -e POSTGRES_PASSWORD=kvpass -e POSTGRES_DB=kvdb -p 5432:5432 postgres:15
+
+docker run -d --name kv_server --cpuset-cpus="1" -e DB_HOST=postgres -e DB_USER=kvuser -e DB_PASSWORD=kvpass -e DB_NAME=kvdb -p 8080:8080 project_main-kv_server
+
+docker run -d --name loadtester --cpuset-cpus="2" -e SERVER_HOST=kv_server -e SERVER_PORT=8080 loadtester_image
+
+
+iostat -x 1

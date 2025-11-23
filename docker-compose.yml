@@ -12,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    deploy:            
+      resources:
+        reservations:
+          cpus: '0.0' 
+    cpuset: "1"       # <-- pin to CPU 1
 
   kv_server:
     build: ./server
@@ -25,6 +30,7 @@ services:
       DB_NAME: kvdb
     ports:
       - "8080:8080"
+    cpuset: "2"       # <-- pin to CPU 1
 
   loadtester:
     build: ./loadtester
@@ -36,7 +42,7 @@ services:
       SERVER_HOST: kv_server
       SERVER_PORT: 8080
       GET_PERCENT: 5  # Will override the default 70
-      PUT_PERCENT: 90  # Will override the default 20
+      PUT_PERCENT: 94  # Will override the default 20
 
 volumes:
   pgdata:
