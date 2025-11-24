@@ -32,7 +32,7 @@ private:
     std::condition_variable cv_;
 
 public:
-    PGPool(const std::string &conninfo, int pool_size = 8)
+    PGPool(const std::string &conninfo, int pool_size = 4)
         : conninfo_(conninfo)
     {
         for (int i = 0; i < pool_size; ++i)
